@@ -30,6 +30,7 @@ Use common variables
 
 | name                          | required | default                                                                                                            | desc                                                                                     |
 | ----                          | ----     | ----                                                                                                               | ----                                                                                     |
+| docker_build_server_host      | yes      | nil                                                                                                                | Build server hostname or SSH::Host object                                                |
 | docker_build_base_dir         | yes      | nil                                                                                                                | Repository clone to here, and execute build command here                                 |
 | docker_registry               | no       | nil                                                                                                                | Docker registry hostname. if use DockerHub, keep nil                                     |
 | docker_build_cmd              | no       | `-> { [:docker, "build", "-t", fetch(:docker_tag_full), "."] }`                                                    | Execute command for image building                                                       |
