@@ -21,6 +21,15 @@ Or install it yourself as:
 
     $ gem install capistrano-dockerbuild
 
+## Usage
+
+Add `require` and `install_plugin` to Capfile.
+
+```ruby
+require 'capistrano/dockerbuild'
+install_plugin Capistrano::Dockerbuild
+```
+
 ## Variables
 
 #### Common Variables
