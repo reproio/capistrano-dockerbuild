@@ -36,9 +36,10 @@ namespace :docker do
     on fetch(:docker_build_server_host) do
       within dockerbuild_plugin.docker_build_base_path do
         timestamp = Time.now.to_i
-        worktree_dir_name = "worktree-#{fetch(:docker_tag)}-#{timestamp}"
+        git_sha1 = `git rev-parse #{fetch(:branch)}`.chomp
+        worktree_dir_name = "worktree-#{git_sha1}-#{timestamp}"
 
-        execute(:git, :worktree, :add, worktree_dir_name, fetch(:branch))
+        execute(:git, :worktree, :add, worktree_dir_name, git_sha1)
 
         begin
           within worktree_dir_name do
