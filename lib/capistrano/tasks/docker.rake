@@ -59,6 +59,11 @@ namespace :docker do
     on fetch(:docker_build_server_host) do
       execute(:docker, :tag, fetch(:docker_tag_full), fetch(:docker_remote_tag_full))
       execute(:docker, :push, fetch(:docker_remote_tag_full))
+      if fetch(:docker_latest_tag)
+        latest_tag = "#{fetch(:docker_registry) &.+ "/"}#{fetch(:docker_remote_repository_name)}:latest"
+        execute(:docker, :tag, fetch(:docker_tag_full), latest_tag)
+        execute(:docker, :push, latest_tag)
+      end
     end
   end
 
