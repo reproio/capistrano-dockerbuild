@@ -7,6 +7,7 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     set_if_empty :docker_remote_repository_name, -> { fetch(:docker_repository_name) }
     set_if_empty :docker_remote_tag, -> { fetch(:docker_tag) }
     set_if_empty :docker_remote_tag_full, -> { "#{fetch(:docker_registry) &.+ "/"}#{fetch(:docker_remote_repository_name)}:#{fetch(:docker_remote_tag)}" }
+    set_if_empty :docker_latest_tag, false
     set_if_empty :keep_docker_image_count, 10
   end
 
