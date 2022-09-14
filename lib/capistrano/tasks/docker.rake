@@ -62,7 +62,7 @@ namespace :docker do
             execute(:rm, "-rf", worktree_dir_name)
             execute(:git, :worktree, :prune)
             # Execute "git gc" manually to avoid "There are too many unreachable loose objects" warning
-            execute(:git, :gc, "--auto", "--prune=3.days.ago")
+            execute(:git, :gc, "--auto", "--prune=#{fetch(:git_gc_prune_date)}")
           end
         end
       end
