@@ -14,7 +14,7 @@ namespace :docker do
     on fetch(:docker_build_server_host) do
       if fetch(:docker_build_no_worktree)
         if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/.git/HEAD ] "
-          info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
+          info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
             execute :git, :clone, repo_url, dockerbuild_plugin.docker_build_base_path.to_s
@@ -46,8 +46,8 @@ namespace :docker do
     on fetch(:docker_build_server_host) do
       within dockerbuild_plugin.docker_build_base_path do
         if fetch(:docker_build_no_worktree)
-          execute(:git, :reset, "--hard", fetch(:branch))
-          execute(*fetch(:docker_build_cmd))
+          commands = "sha1=$(git rev-parse #{fetch(:branch)}); git reset --hard ${sha1}; #{fetch(:docker_build_cmd).map {|c| c.to_s.shellescape }.join(" ")}"
+          execute(:flock, "capistrano_dockerbuild.lock", "-c", "'#{commands}'")
         else
           timestamp = Time.now.to_i
           worktree_dir_name = "worktree-#{fetch(:docker_tag)}-#{timestamp}"
