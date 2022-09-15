@@ -12,11 +12,21 @@ namespace :docker do
   desc "Clone the repo to docker build base directory"
   task :clone => [:'docker:check'] do
     on fetch(:docker_build_server_host) do
-      if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/HEAD ] "
-        info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
+      if fetch(:docker_build_no_worktree)
+        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/.git/HEAD ] "
+          info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
+        else
+          within dockerbuild_plugin.docker_build_base_path.dirname do
+            execute :git, :clone, repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+          end
+        end
       else
-        within dockerbuild_plugin.docker_build_base_path.dirname do
-          execute :git, :clone, "--mirror", repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/HEAD ] "
+          info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
+        else
+          within dockerbuild_plugin.docker_build_base_path.dirname do
+            execute :git, :clone, "--mirror", repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+          end
         end
       end
     end
@@ -35,21 +45,26 @@ namespace :docker do
   task :build => [:'docker:update_mirror'] do
     on fetch(:docker_build_server_host) do
       within dockerbuild_plugin.docker_build_base_path do
-        timestamp = Time.now.to_i
-        git_sha1 = `git rev-parse #{fetch(:branch)}`.chomp
-        worktree_dir_name = "worktree-#{git_sha1}-#{timestamp}"
+        if fetch(:docker_build_no_worktree)
+          commands = "sha1=$(git rev-parse #{fetch(:branch)}); git reset --hard ${sha1}; #{fetch(:docker_build_cmd).map {|c| c.to_s.shellescape }.join(" ")}"
+          execute(:flock, "capistrano_dockerbuild.lock", "-c", "'#{commands}'")
+        else
+          timestamp = Time.now.to_i
+          git_sha1 = `git rev-parse #{fetch(:branch)}`.chomp
+          worktree_dir_name = "worktree-#{git_sha1}-#{timestamp}"
 
-        execute(:git, :worktree, :add, worktree_dir_name, git_sha1)
+          execute(:git, :worktree, :add, worktree_dir_name, git_sha1)
 
-        begin
-          within worktree_dir_name do
-            execute(*fetch(:docker_build_cmd))
+          begin
+            within worktree_dir_name do
+              execute(*fetch(:docker_build_cmd))
+            end
+          ensure
+            execute(:rm, "-rf", worktree_dir_name)
+            execute(:git, :worktree, :prune)
+            # Execute "git gc" manually to avoid "There are too many unreachable loose objects" warning
+            execute(:git, :gc, "--auto", "--prune=#{fetch(:git_gc_prune_date)}")
           end
-        ensure
-          execute(:rm, "-rf", worktree_dir_name)
-          execute(:git, :worktree, :prune)
-          # Execute "git gc" manually to avoid "There are too many unreachable loose objects" warning
-          execute(:git, :gc, "--auto", "--prune=#{fetch(:git_gc_prune_date)}")
         end
       end
     end

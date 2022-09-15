@@ -10,6 +10,7 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     set_if_empty :docker_latest_tag, false
     set_if_empty :keep_docker_image_count, 10
     set_if_empty :git_gc_prune_date, "3.days.ago"
+    set_if_empty :docker_build_no_worktree, false
   end
 
   def define_tasks
