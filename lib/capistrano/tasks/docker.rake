@@ -5,7 +5,7 @@ namespace :docker do
   task :check do
     on fetch(:docker_build_server_host) do
       execute :mkdir, "-p", dockerbuild_plugin.docker_build_base_path.dirname.to_s
-      execute :git, :'ls-remote', repo_url, "HEAD"
+      execute :git, :'ls-remote', dockerbuild_plugin.git_repo_url, "HEAD"
     end
   end
 
@@ -17,7 +17,7 @@ namespace :docker do
           info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
-            execute :git, :clone, repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
           end
         end
       else
@@ -25,7 +25,7 @@ namespace :docker do
           info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
-            execute :git, :clone, "--mirror", repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            execute :git, :clone, "--mirror", dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
           end
         end
       end
@@ -36,6 +36,7 @@ namespace :docker do
   task update_mirror: :'docker:clone' do
     on fetch(:docker_build_server_host) do
       within dockerbuild_plugin.docker_build_base_path do
+        execute :git, :remote, "set-url", :origin, dockerbuild_plugin.git_repo_url
         execute :git, :remote, :update, "--prune"
       end
     end

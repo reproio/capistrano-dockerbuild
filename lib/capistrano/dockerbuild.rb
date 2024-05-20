@@ -1,3 +1,6 @@
+require "cgi"
+require "uri"
+
 class Capistrano::Dockerbuild < Capistrano::Plugin
   def set_defaults
     set_if_empty :docker_build_cmd, -> { [:docker, "build", "-t", fetch(:docker_tag_full), "."] }
@@ -20,5 +23,20 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
   def docker_build_base_path
     raise "Need to set :docker_build_base_dir" unless fetch(:docker_build_base_dir)
     Pathname(fetch(:docker_build_base_dir))
+  end
+
+  def git_repo_url
+    if fetch(:git_http_username) && fetch(:git_http_password)
+      URI.parse(repo_url).tap do |repo_uri|
+        repo_uri.user     = fetch(:git_http_username)
+        repo_uri.password = CGI.escape(fetch(:git_http_password))
+      end.to_s
+    elsif fetch(:git_http_username)
+      URI.parse(repo_url).tap do |repo_uri|
+        repo_uri.user = fetch(:git_http_username)
+      end.to_s
+    else
+      repo_url
+    end
   end
 end
