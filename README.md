@@ -50,7 +50,24 @@ Use common variables
 | docker_remote_tag             | no       | `-> { fetch(:docker_tag) }`                                                                                        | Use by `docker push docker_registry/docker_remote_repository_name:{{docker_remote_tag}}` |
 | docker_remote_tag_full        | no       | `-> { "#{fetch(:docker_registry) &.+ "/"}#{fetch(:docker_remote_repository_name)}:#{fetch(:docker_remote_tag)}" }` | Use by `docker push {{docker_remote_tag_full}}`                                          |
 | keep_docker_image_count       | no       | 10                                                                                                                 |                                                                                          |
+| git_http_username             | no       | nil                                                                                                                | See below                                                                                |
+| git_http_password             | no       | nil                                                                                                                | See below                                                                                |
 
+If you want to use GitHub Apps installation access token or something to authorize repository access using HTTPS protocol. You can set variables in your config/deploy.rb:
+
+```ruby
+set :git_http_username, -> { ENV["GIT_HTTP_USERNAME"] }
+set :git_http_password, -> { ENV["GIT_HTTP_PASSWORD"] }
+set :repo_url, -> do
+  if fetch(:git_http_username) && fetch(:git_http_password)
+    "https://github.com/owner/repo.git"
+  else
+    "git@github.com:owner/repo.git"
+  end
+end
+```
+
+Update remote URL always if you set proper value to all of `repo_url`, `git_http_username`, and `git_http_password`.
 
 ## Tasks
 
