@@ -83,6 +83,14 @@ namespace :docker do
     end
   end
 
+  task :push_unless_exists => [:'docker:build'] do
+    on fetch(:docker_build_server_host) do
+      unless test "docker manifest inspect #{fetch(:docker_remote_tag_full)}"
+        invoke "docker:push"
+      end
+    end
+  end
+
   task :cleanup_local_images do
     on fetch(:docker_build_server_host) do
       local_images = []
