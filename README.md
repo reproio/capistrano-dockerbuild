@@ -55,14 +55,13 @@ server "docker-build-amd64.example.com", roles: [:docker_build], ssh_options: fe
 server "docker-build-arm64.example.com", roles: [:docker_build], ssh_options: fetch(:ssh_options), arch: "arm64"
 
 set :docker_registry, "ghcr.io"
-set :docker_repository_name, "namespace/image"
 set :docker_build_base_dir, "/home/#{fetch(:ssh_user)}/#{fetch(:application)}"
 
 # if docker_build_cmd is proc and has more than 1 arity, pass host object.
 set :docker_build_cmd, ->(host) {
-  [:docker, "build", "-f", "Dockerfile", "-t", fetch(:docker_tag_full), "--build-arg", "host=#{host}", "."]
+  [:docker, "build", "-f", "Dockerfile", "-t", fetch(:docker_tag_with_arch).call(host), "--build-arg", "host=#{host}", "."]
 }
-set :docker_tag, fetch(:git_sha1)
+set :docker_tag, "ghcr.io/NAMESPACE/IMAGE_NAME:#{fetch(:git_sha1)}"
 ```
 
 If any servers have `arch` property, this plugin enables multi architecture mode.
