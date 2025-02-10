@@ -30,6 +30,48 @@ require 'capistrano/dockerbuild'
 install_plugin Capistrano::Dockerbuild
 ```
 
+```ruby
+# deploy.rb
+
+set :application, :sample_project
+
+set :repo_url, 'git@github.com:example/example.git'
+
+set :git_sha1, `git rev-parse HEAD`.chomp
+
+set :branch, fetch(:git_sha1)
+
+set :ssh_user, ENV["SSH_USER"] || ENV["USER"] || Etc.getlogin
+
+set :ssh_options, {
+  user: fetch(:ssh_user),
+  port: 22,
+  use_agent: true,
+}
+
+# add :docker_build role to server definition
+# add :arch property to server definition
+server "docker-build-amd64.example.com", roles: [:docker_build], ssh_options: fetch(:ssh_options), arch: "amd64"
+server "docker-build-arm64.example.com", roles: [:docker_build], ssh_options: fetch(:ssh_options), arch: "arm64"
+
+set :docker_registry, "ghcr.io"
+set :docker_build_base_dir, "/home/#{fetch(:ssh_user)}/#{fetch(:application)}"
+
+# if docker_build_cmd is proc and has more than 1 arity, pass host object.
+set :docker_build_cmd, ->(host) {
+  [:docker, "build", "-f", "Dockerfile", "-t", fetch(:docker_tag_with_arch).call(host), "--build-arg", "host=#{host}", "."]
+}
+set :docker_tag, "ghcr.io/NAMESPACE/IMAGE_NAME:#{fetch(:git_sha1)}"
+```
+
+If any servers have `arch` property, this plugin enables multi architecture mode.
+
+The behavior of multi architecture mode is following.
+
+1. build image with a arch suffix like `-amd64`
+1. push the image
+1. create a manifest list of pushed images and push it on first server
+
 ## Variables
 
 #### Common Variables
@@ -39,16 +81,10 @@ Use common variables
 
 | name                          | required | default                                                                                                            | desc                                                                                     |
 | ----                          | ----     | ----                                                                                                               | ----                                                                                     |
-| docker_build_server_host      | yes      | nil                                                                                                                | Build server hostname or SSH::Host object                                                |
 | docker_build_base_dir         | yes      | nil                                                                                                                | Repository clone to here, and execute build command here                                 |
-| docker_registry               | no       | nil                                                                                                                | Docker registry hostname. if use DockerHub, keep nil                                     |
-| docker_build_cmd              | no       | `-> { [:docker, "build", "-t", fetch(:docker_tag_full), "."] }`                                                    | Execute command for image building                                                       |
-| docker_repository_name        | no       | `-> { fetch(:application) }`                                                                                       | Use by `docker tag {{docker_repository_name}}:tag`                                       |
-| docker_tag                    | no       | `-> { fetch(:branch) }`                                                                                            | Use by `docker tag repository:{{docker_tag}}`                                            |
-| docker_tag_full               | no       | `-> { #{fetch(:docker_repository_name)}:#{fetch(:docker_tag)}" }`                                                  | Use by `docker tag {{docker_tag_full}}`                                                  |
-| docker_remote_repository_name | no       | `-> { fetch(:docker_repository_name) }`                                                                            | Use by `docker push docker_registry/{{docker_remote_repository_name}}:docker_remote_tag` |
-| docker_remote_tag             | no       | `-> { fetch(:docker_tag) }`                                                                                        | Use by `docker push docker_registry/docker_remote_repository_name:{{docker_remote_tag}}` |
-| docker_remote_tag_full        | no       | `-> { "#{fetch(:docker_registry) &.+ "/"}#{fetch(:docker_remote_repository_name)}:#{fetch(:docker_remote_tag)}" }` | Use by `docker push {{docker_remote_tag_full}}`                                          |
+| docker_build_cmd              | no       | `->(host) { [:docker, :build, "-t", fetch(:docker_tag_with_arch).call(host), "."] }`                                                    | Execute command for image building                                                       |
+| docker_tag                    | no       | `-> { fetch(:application) + ":" + fetch(:branch) }`                                                                                            | Use by `docker tag repository:{{docker_tag}}`                                            |
+| docker_latest_tag       | no       | false                                                                                                                 | Add latest tag to building image                                                         |
 | keep_docker_image_count       | no       | 10                                                                                                                 |                                                                                          |
 | git_http_username             | no       | nil                                                                                                                | See below                                                                                |
 | git_http_password             | no       | nil                                                                                                                | See below                                                                                |
@@ -87,8 +123,7 @@ Update remote URL always if you set proper value to all of `repo_url`, `git_http
 - Clear worktree
 
 #### docker:push
-- docker tag `#{docker_tag_full}` `#{docker_remote_tag_full}`
-- docker push `#{docker_remote_tag_full}`
+- docker push `#{docker_tag}`
 
 #### docker:cleanup_local_images
 - Remove docker images

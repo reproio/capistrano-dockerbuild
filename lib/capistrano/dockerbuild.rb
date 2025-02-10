@@ -3,13 +3,14 @@ require "uri"
 
 class Capistrano::Dockerbuild < Capistrano::Plugin
   def set_defaults
-    set_if_empty :docker_build_cmd, -> { [:docker, "build", "-t", fetch(:docker_tag_full), "."] }
-    set_if_empty :docker_repository_name, -> { fetch(:application) }
-    set_if_empty :docker_tag, -> { fetch(:branch) }
-    set_if_empty :docker_tag_full, -> { "#{fetch(:docker_repository_name)}:#{fetch(:docker_tag)}" }
-    set_if_empty :docker_remote_repository_name, -> { fetch(:docker_repository_name) }
-    set_if_empty :docker_remote_tag, -> { fetch(:docker_tag) }
-    set_if_empty :docker_remote_tag_full, -> { "#{fetch(:docker_registry) &.+ "/"}#{fetch(:docker_remote_repository_name)}:#{fetch(:docker_remote_tag)}" }
+    set_if_empty :docker_tag, -> { fetch(:application) + ":" + fetch(:branch) }
+    set :docker_tag_with_arch, ->(host) do
+      arch_suffix = host.properties.arch ? "-#{host.properties.arch}" : ""
+      fetch(:docker_tag) + arch_suffix
+    end
+    set_if_empty :docker_build_cmd, ->(host) do
+      [:docker, :build, "-t", fetch(:docker_tag_with_arch).call(host), "."]
+    end
     set_if_empty :docker_latest_tag, false
     set_if_empty :keep_docker_image_count, 10
     set_if_empty :git_gc_prune_date, "3.days.ago"
