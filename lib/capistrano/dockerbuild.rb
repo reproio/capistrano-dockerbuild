@@ -42,6 +42,10 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     end
   end
 
+  def git_repo_host
+    URI.parse(repo_url.sub(/^git@.*/) {|m| "https://#{m}" }).host
+  end
+
   def tmp_home(host)
     @tmp_host ||= {}
     @tmp_host[host.properties.arch] ||= Dir.mktmpdir(host.properties.arch) {|s| s }

@@ -6,10 +6,11 @@ namespace :docker do
     on roles(:docker_build) do |host|
       unless fetch(:git_auth_token).to_s.empty?
         tmp_home = dockerbuild_plugin.tmp_home(host)
+        git_host = dockerbuild_plugin.git_repo_host
         execute :mkdir, "-p", tmp_home
         execute :git, :config, "--file", "#{tmp_home}/.gitconfig", "http.extraheader", "'Authorization: Basic #{fetch(:git_auth_token)}'"
-        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", 'url."https://github.com/".insteadOf', "git@github.com:"
-        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", "--add", 'url."https://github.com/".insteadOf', "ssh://git@github.com/"
+        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", %Q(url."https://#{git_host}/".insteadOf), "git@#{git_host}:"
+        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", "--add", %Q(url."https://#{git_host}/".insteadOf), "ssh://git@#{git_host}/"
       end
     end
   end
