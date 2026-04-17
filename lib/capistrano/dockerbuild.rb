@@ -1,5 +1,6 @@
 require "cgi"
 require "uri"
+require "securerandom"
 
 class Capistrano::Dockerbuild < Capistrano::Plugin
   def set_defaults
@@ -48,7 +49,7 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
 
   def tmp_home(host)
     @tmp_host ||= {}
-    @tmp_host[host.properties.arch] ||= Dir.mktmpdir(host.properties.arch) {|s| s }
+    @tmp_host[host.properties.arch] ||= "/tmp/capistrano-dockerbuild-#{SecureRandom.hex(8)}"
   end
 
   def git_env(host)
