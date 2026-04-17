@@ -47,13 +47,6 @@ namespace :docker do
               execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
             end
           end
-          if fetch(:update_git_submodule)
-            within dockerbuild_plugin.docker_build_base_path do
-              with dockerbuild_plugin.git_env(host) do
-                execute :git, :submodule, :update, "--init", "--recursive"
-              end
-            end
-          end
         end
       else
         if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/HEAD ] "
@@ -94,8 +87,11 @@ namespace :docker do
       end
       within dockerbuild_plugin.docker_build_base_path do
         if fetch(:docker_build_no_worktree)
-          commands = "sha1=$(git rev-parse #{fetch(:branch)}); git reset --hard ${sha1}; #{build_cmd.map {|c| c.to_s.shellescape }.join(" ")}"
-          execute(:flock, "capistrano_dockerbuild.lock", "-c", "'#{commands}'")
+          submodule_cmd = fetch(:update_git_submodule) ? "; git submodule update --init --recursive" : ""
+          commands = "sha1=$(git rev-parse #{fetch(:branch)}); git reset --hard ${sha1}#{submodule_cmd}; #{build_cmd.map {|c| c.to_s.shellescape }.join(" ")}"
+          with dockerbuild_plugin.git_env(host) do
+            execute(:flock, "capistrano_dockerbuild.lock", "-c", "'#{commands}'")
+          end
         else
           timestamp = Time.now.to_i
           git_sha1 = `git rev-parse #{fetch(:branch)}`.chomp
