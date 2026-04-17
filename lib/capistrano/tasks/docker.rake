@@ -1,11 +1,36 @@
 dockerbuild_plugin = self
 
 namespace :docker do
-  desc "check directory exist"
-  task :check do
+  desc "setup temporary gitconfig for HTTP authentication"
+  task :setup do
     on roles(:docker_build) do |host|
-      execute :mkdir, "-p", dockerbuild_plugin.docker_build_base_path.dirname.to_s
-      execute :git, :'ls-remote', dockerbuild_plugin.git_repo_url, "HEAD"
+      unless fetch(:git_auth_token).to_s.empty?
+        tmp_home = dockerbuild_plugin.tmp_home(host)
+        execute :mkdir, "-p", tmp_home
+        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", "http.extraheader", "'Authorization: Basic #{fetch(:git_auth_token)}'"
+        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", 'url."https://github.com/".insteadOf', "git@github.com:"
+        execute :git, :config, "--file", "#{tmp_home}/.gitconfig", "--add", 'url."https://github.com/".insteadOf', "ssh://git@github.com/"
+      end
+    end
+  end
+
+  desc "clean up temporary gitconfig"
+  task :clean do
+    on roles(:docker_build) do |host|
+      unless fetch(:git_auth_token).to_s.empty?
+        tmp_home = dockerbuild_plugin.tmp_home(host)
+        execute :rm, "-rf", tmp_home
+      end
+    end
+  end
+
+  desc "check directory exist"
+  task check: [:"docker:setup"] do
+    on roles(:docker_build) do |host|
+      with dockerbuild_plugin.git_env(host) do
+        execute :mkdir, "-p", dockerbuild_plugin.docker_build_base_path.dirname.to_s
+        execute :git, :'ls-remote', dockerbuild_plugin.git_repo_url, "HEAD"
+      end
     end
   end
 
@@ -17,7 +42,16 @@ namespace :docker do
           info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
-            execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            with dockerbuild_plugin.git_env(host) do
+              execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            end
+          end
+          if fetch(:update_git_submodule)
+            within dockerbuild_plugin.docker_build_base_path do
+              with dockerbuild_plugin.git_env(host) do
+                execute :git, :submodule, :update, "--init", "--recursive"
+              end
+            end
           end
         end
       else
@@ -25,7 +59,9 @@ namespace :docker do
           info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
-            execute :git, :clone, "--mirror", dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            with dockerbuild_plugin.git_env(host) do
+              execute :git, :clone, "--mirror", dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+            end
           end
         end
       end
@@ -36,8 +72,10 @@ namespace :docker do
   task update_mirror: :'docker:clone' do
     on roles(:docker_build) do |host|
       within dockerbuild_plugin.docker_build_base_path do
-        execute :git, :remote, "set-url", :origin, dockerbuild_plugin.git_repo_url
-        execute :git, :remote, :update, "--prune"
+        with dockerbuild_plugin.git_env(host) do
+          execute :git, :remote, "set-url", :origin, dockerbuild_plugin.git_repo_url
+          execute :git, :remote, :update, "--prune"
+        end
       end
     end
   end
@@ -66,6 +104,11 @@ namespace :docker do
 
           begin
             within worktree_dir_name do
+              if fetch(:update_git_submodule)
+                with dockerbuild_plugin.git_env(host) do
+                  execute :git, :submodule, :update, "--init", "--recursive"
+                end
+              end
               execute(*build_cmd)
             end
           ensure
@@ -136,3 +179,5 @@ namespace :docker do
     end
   end
 end
+
+after "docker:build", "docker:clean"
