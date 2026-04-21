@@ -88,6 +88,8 @@ Use common variables
 | keep_docker_image_count       | no       | 10                                                                                                                 |                                                                                          |
 | git_http_username             | no       | nil                                                                                                                | See below                                                                                |
 | git_http_password             | no       | nil                                                                                                                | See below                                                                                |
+| git_auth_token                | no       | nil                                                                                                                | See below                                                                                |
+| update_git_submodule          | no       | false                                                                                                              | Run `git submodule update --init --recursive` after checkout                             |
 
 If you want to use GitHub Apps installation access token or something to authorize repository access using HTTPS protocol. You can set variables in your config/deploy.rb:
 
@@ -105,7 +107,31 @@ end
 
 Update remote URL always if you set proper value to all of `repo_url`, `git_http_username`, and `git_http_password`.
 
+Alternatively, you can authenticate via an HTTP `Authorization` header using `:git_auth_token`. This is useful when the build server has no SSH key access to the repository (e.g. using a GitHub Apps installation access token or a personal access token).
+
+```ruby
+set :git_auth_token, -> { ENV["GIT_AUTH_TOKEN"] }
+set :repo_url, "git@github.com:owner/repo.git"  # SSH or HTTPS both work
+```
+
+When `:git_auth_token` is set, `docker:setup` creates a temporary `.gitconfig` on each remote build host containing:
+
+- `http.extraheader = Authorization: Basic <token>` — injects the token into every HTTPS git request
+- `url."https://<host>/".insteadOf` rules — rewrites SSH-style URLs (`git@host:` and `ssh://git@host/`) to HTTPS so the token is used regardless of how `repo_url` is written
+
+The host is derived automatically from `:repo_url`, so this works with GitHub, GitLab, Bitbucket, or any self-hosted git server.
+
+The temporary directory is removed automatically by `docker:clean` after `docker:build`.
+
 ## Tasks
+
+#### docker:setup
+- Create a temporary `.gitconfig` on each remote build host when `:git_auth_token` is set
+- Automatically invoked before `docker:check`
+
+#### docker:clean
+- Remove the temporary directory created by `docker:setup`
+- Automatically invoked after `docker:build`
 
 #### docker:check
 - Ensure `#{docker_build_base_dir}`
@@ -132,7 +158,9 @@ Update remote URL always if you set proper value to all of `repo_url`, `git_http
 
 ## Task Dependency
 
-docker:push => docker:build => docker:update_mirror => docker:clone => docker:check
+docker:push => docker:build => docker:update_mirror => docker:clone => docker:check => docker:setup
+
+docker:clean is triggered automatically after docker:build
 
 ## Development
 

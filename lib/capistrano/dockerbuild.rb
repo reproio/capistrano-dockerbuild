@@ -1,5 +1,6 @@
 require "cgi"
 require "uri"
+require "securerandom"
 
 class Capistrano::Dockerbuild < Capistrano::Plugin
   def set_defaults
@@ -15,6 +16,7 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     set_if_empty :keep_docker_image_count, 10
     set_if_empty :git_gc_prune_date, "3.days.ago"
     set_if_empty :docker_build_no_worktree, false
+    set_if_empty :update_git_submodule, false
   end
 
   def define_tasks
@@ -39,5 +41,21 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     else
       repo_url
     end
+  end
+
+  def git_repo_host
+    URI.parse(repo_url.sub(/^git@.*/) {|m| "https://#{m}" }).host
+  end
+
+  def tmp_home(host)
+    @tmp_host ||= {}
+    @tmp_host[host.properties.arch] ||= "/tmp/capistrano-dockerbuild-#{SecureRandom.hex(8)}"
+  end
+
+  def git_env(host)
+    return {} if fetch(:git_auth_token).to_s.empty?
+
+    @git_env ||= {}
+    @git_env[host.properties.arch] ||= { HOME: tmp_home(host), GIT_CONFIG_NOSYSTEM: "1" }
   end
 end
