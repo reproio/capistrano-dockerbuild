@@ -44,7 +44,8 @@ namespace :docker do
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
             with dockerbuild_plugin.git_env(host) do
-              execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+              commands = "git clone #{dockerbuild_plugin.git_repo_url.shellescape} #{dockerbuild_plugin.docker_build_base_path.to_s.shellescape}"
+              execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
             end
           end
         end
@@ -54,7 +55,8 @@ namespace :docker do
         else
           within dockerbuild_plugin.docker_build_base_path.dirname do
             with dockerbuild_plugin.git_env(host) do
-              execute :git, :clone, "--mirror", dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+              commands = "git clone --mirror #{dockerbuild_plugin.git_repo_url.shellescape} #{dockerbuild_plugin.docker_build_base_path.to_s.shellescape}"
+              execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
             end
           end
         end
@@ -67,8 +69,8 @@ namespace :docker do
     on roles(:docker_build) do |host|
       within dockerbuild_plugin.docker_build_base_path do
         with dockerbuild_plugin.git_env(host) do
-          execute :git, :remote, "set-url", :origin, dockerbuild_plugin.git_repo_url
-          execute :git, :remote, :update, "--prune"
+          commands = "git remote set-url origin #{dockerbuild_plugin.git_repo_url.shellescape} && git remote update --prune"
+          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
         end
       end
     end

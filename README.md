@@ -139,9 +139,11 @@ The temporary directory is removed automatically by `docker:clean` after `docker
 
 #### docker:clone
 - Clone repo to `#{docker_build_base_dir}` as mirror
+- Serialized with `docker:update_mirror` via a per-host `flock`, since both mutate the mirror repo at `#{docker_build_base_dir}`. This matters when multiple deploys (e.g. CI jobs for different branches) target the same build host concurrently — without it, concurrent `git clone`/`git remote update` on the shared mirror can corrupt its `.git/config` or fail with transport errors.
 
 #### docker:update_mirror
 - git remote update `#{docker_build_base_dir}`
+- Serialized with `docker:clone` via the same per-host `flock` (see above)
 
 #### docker:build
 - Create `#{branch}` worktree to `#{docker_tag}-#{timestamp}`
