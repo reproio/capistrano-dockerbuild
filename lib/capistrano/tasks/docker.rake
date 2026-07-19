@@ -51,7 +51,7 @@ namespace :docker do
             else
               "[ -f #{path}/HEAD ] || git clone --mirror #{url} #{path}"
             end
-          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", commands.shellescape
+          execute :flock, dockerbuild_plugin.docker_build_lock_path.shellescape, "-c", commands.shellescape
         end
       end
     end
@@ -63,7 +63,7 @@ namespace :docker do
       within dockerbuild_plugin.docker_build_base_path do
         with dockerbuild_plugin.git_env(host) do
           commands = "git remote set-url origin #{dockerbuild_plugin.git_repo_url.shellescape} && git remote update --prune"
-          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", commands.shellescape
+          execute :flock, dockerbuild_plugin.docker_build_lock_path.shellescape, "-c", commands.shellescape
         end
       end
     end
