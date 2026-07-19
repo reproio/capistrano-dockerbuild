@@ -38,27 +38,20 @@ namespace :docker do
   desc "Clone the repo to docker build base directory"
   task :clone => [:'docker:check'] do
     on roles(:docker_build) do |host|
-      if fetch(:docker_build_no_worktree)
-        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/.git/HEAD ] "
-          info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
-        else
-          within dockerbuild_plugin.docker_build_base_path.dirname do
-            with dockerbuild_plugin.git_env(host) do
-              commands = "git clone #{dockerbuild_plugin.git_repo_url.shellescape} #{dockerbuild_plugin.docker_build_base_path.to_s.shellescape}"
-              execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
+      within dockerbuild_plugin.docker_build_base_path.dirname do
+        with dockerbuild_plugin.git_env(host) do
+          path = dockerbuild_plugin.docker_build_base_path.to_s.shellescape
+          url = dockerbuild_plugin.git_repo_url.shellescape
+          # Existence check runs inside the same flock as the clone itself, not before
+          # acquiring it — otherwise two concurrent deploys can both observe the repo
+          # missing and the second `git clone` fails once the first has created it.
+          commands =
+            if fetch(:docker_build_no_worktree)
+              "[ -f #{path}/.git/HEAD ] || git clone #{url} #{path}"
+            else
+              "[ -f #{path}/HEAD ] || git clone --mirror #{url} #{path}"
             end
-          end
-        end
-      else
-        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/HEAD ] "
-          info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
-        else
-          within dockerbuild_plugin.docker_build_base_path.dirname do
-            with dockerbuild_plugin.git_env(host) do
-              commands = "git clone --mirror #{dockerbuild_plugin.git_repo_url.shellescape} #{dockerbuild_plugin.docker_build_base_path.to_s.shellescape}"
-              execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
-            end
-          end
+          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", commands.shellescape
         end
       end
     end
@@ -70,7 +63,7 @@ namespace :docker do
       within dockerbuild_plugin.docker_build_base_path do
         with dockerbuild_plugin.git_env(host) do
           commands = "git remote set-url origin #{dockerbuild_plugin.git_repo_url.shellescape} && git remote update --prune"
-          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", "'#{commands}'"
+          execute :flock, dockerbuild_plugin.docker_build_lock_path, "-c", commands.shellescape
         end
       end
     end

@@ -29,9 +29,10 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
     Pathname(fetch(:docker_build_base_dir))
   end
 
-  # Lock file path used to serialize access to the shared mirror repo at
-  # docker_build_base_path when multiple deploys (e.g. CI jobs for different
-  # branches) run concurrently on the same build host.
+  # Lock file path used to serialize access to the shared repo directory
+  # (a mirror by default, or a regular checkout under :docker_build_no_worktree)
+  # at docker_build_base_path when multiple deploys (e.g. CI jobs for
+  # different branches) run concurrently on the same build host.
   def docker_build_lock_path
     docker_build_base_path.dirname.join("capistrano_dockerbuild.lock").to_s
   end
