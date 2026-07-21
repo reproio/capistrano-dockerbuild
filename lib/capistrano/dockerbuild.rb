@@ -1,6 +1,7 @@
 require "cgi"
 require "uri"
 require "securerandom"
+require "shellwords"
 
 class Capistrano::Dockerbuild < Capistrano::Plugin
   def set_defaults
@@ -26,6 +27,16 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
   def docker_build_base_path
     raise "Need to set :docker_build_base_dir" unless fetch(:docker_build_base_dir)
     Pathname(fetch(:docker_build_base_dir))
+  end
+
+  # Lock serializing access to the shared repo dir at docker_build_base_path
+  # across concurrent deploys on the same build host (see README for the race).
+  #
+  # Keyed by basename, not a fixed name, so unrelated consumers sharing a parent
+  # directory don't serialize against each other.
+  def docker_build_lock_path
+    base = docker_build_base_path
+    base.dirname.join("capistrano_dockerbuild.#{base.basename}.lock").to_s
   end
 
   def git_repo_url

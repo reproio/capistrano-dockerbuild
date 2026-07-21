@@ -38,25 +38,20 @@ namespace :docker do
   desc "Clone the repo to docker build base directory"
   task :clone => [:'docker:check'] do
     on roles(:docker_build) do |host|
-      if fetch(:docker_build_no_worktree)
-        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/.git/HEAD ] "
-          info "The repository is at #{dockerbuild_plugin.docker_build_base_path}"
-        else
-          within dockerbuild_plugin.docker_build_base_path.dirname do
-            with dockerbuild_plugin.git_env(host) do
-              execute :git, :clone, dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
+      within dockerbuild_plugin.docker_build_base_path.dirname do
+        with dockerbuild_plugin.git_env(host) do
+          path = dockerbuild_plugin.docker_build_base_path.to_s.shellescape
+          url = dockerbuild_plugin.git_repo_url.shellescape
+          # Existence check runs inside the same flock as the clone itself, not before
+          # acquiring it — otherwise two concurrent deploys can both observe the repo
+          # missing and the second `git clone` fails once the first has created it.
+          commands =
+            if fetch(:docker_build_no_worktree)
+              "[ -f #{path}/.git/HEAD ] || git clone #{url} #{path}"
+            else
+              "[ -f #{path}/HEAD ] || git clone --mirror #{url} #{path}"
             end
-          end
-        end
-      else
-        if test " [ -f #{dockerbuild_plugin.docker_build_base_path}/HEAD ] "
-          info t(:mirror_exists, at: dockerbuild_plugin.docker_build_base_path.to_s)
-        else
-          within dockerbuild_plugin.docker_build_base_path.dirname do
-            with dockerbuild_plugin.git_env(host) do
-              execute :git, :clone, "--mirror", dockerbuild_plugin.git_repo_url, dockerbuild_plugin.docker_build_base_path.to_s
-            end
-          end
+          execute :flock, dockerbuild_plugin.docker_build_lock_path.shellescape, "-c", commands.shellescape
         end
       end
     end
@@ -67,8 +62,8 @@ namespace :docker do
     on roles(:docker_build) do |host|
       within dockerbuild_plugin.docker_build_base_path do
         with dockerbuild_plugin.git_env(host) do
-          execute :git, :remote, "set-url", :origin, dockerbuild_plugin.git_repo_url
-          execute :git, :remote, :update, "--prune"
+          commands = "git remote set-url origin #{dockerbuild_plugin.git_repo_url.shellescape} && git remote update --prune"
+          execute :flock, dockerbuild_plugin.docker_build_lock_path.shellescape, "-c", commands.shellescape
         end
       end
     end
@@ -90,7 +85,7 @@ namespace :docker do
           submodule_cmd = fetch(:update_git_submodule) ? "; git submodule update --init --recursive" : ""
           commands = "sha1=$(git rev-parse #{fetch(:branch)}); git reset --hard ${sha1}#{submodule_cmd}; #{build_cmd.map {|c| c.to_s.shellescape }.join(" ")}"
           with dockerbuild_plugin.git_env(host) do
-            execute(:flock, "capistrano_dockerbuild.lock", "-c", "'#{commands}'")
+            execute(:flock, dockerbuild_plugin.docker_build_lock_path.shellescape, "-c", "'#{commands}'")
           end
         else
           timestamp = Time.now.to_i
