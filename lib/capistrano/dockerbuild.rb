@@ -33,8 +33,13 @@ class Capistrano::Dockerbuild < Capistrano::Plugin
   # (a mirror by default, or a regular checkout under :docker_build_no_worktree)
   # at docker_build_base_path when multiple deploys (e.g. CI jobs for
   # different branches) run concurrently on the same build host.
+  #
+  # Keyed by docker_build_base_path's basename (rather than a fixed name) so
+  # unrelated consumers that happen to share the same parent directory (e.g.
+  # the same SSH user's home) don't serialize against each other.
   def docker_build_lock_path
-    docker_build_base_path.dirname.join("capistrano_dockerbuild.lock").to_s
+    base = docker_build_base_path
+    base.dirname.join("capistrano_dockerbuild.#{base.basename}.lock").to_s
   end
 
   def git_repo_url
